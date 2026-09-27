@@ -1,0 +1,344 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="40 Hz">
+<meta name="theme-color" content="#1F5E7A">
+<title>40 Hz Sound Session</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+html{color-scheme:light} body{margin:0} [hidden]{display:none!important}
+:root{
+  --bg:#EDF0F2; --panel:#FFFFFF; --ink:#16202A; --muted:#5B6873; --line:#D3DADF;
+  --accent:#1F5E7A; --accent-ink:#FFFFFF; --live:#C4671B; --live-soft:#F6E6D6;
+  --warn:#8A5A00; --warn-bg:#FFF4D6; --track:#DCE3E8;
+  --sans:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    color-scheme:dark;
+    --bg:#0F161B; --panel:#172129; --ink:#E4EAEE; --muted:#93A1AC; --line:#2A3743;
+    --accent:#5FA9C9; --accent-ink:#0B1216; --live:#F0973F; --live-soft:#3A2715;
+    --warn:#F2C766; --warn-bg:#2E2511; --track:#25313B;
+  }
+}
+:root[data-theme="dark"]{
+  color-scheme:dark;
+  --bg:#0F161B; --panel:#172129; --ink:#E4EAEE; --muted:#93A1AC; --line:#2A3743;
+  --accent:#5FA9C9; --accent-ink:#0B1216; --live:#F0973F; --live-soft:#3A2715;
+  --warn:#F2C766; --warn-bg:#2E2511; --track:#25313B;
+}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:15px;line-height:1.5;padding-inline:16px;padding-block:20px 40px}
+.wrap{max-width:480px;margin:0 auto;display:flex;flex-direction:column;gap:16px}
+header{display:flex;flex-direction:column;gap:2px}
+h1{font-size:20px;font-weight:600;margin:0;text-wrap:balance}
+.sub{color:var(--muted);font-size:13px;margin:0;font-family:var(--mono)}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:18px}
+.readout{display:flex;flex-direction:column;align-items:center;gap:10px;padding-block:26px}
+.state{font-family:var(--mono);font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);display:flex;align-items:center;gap:8px}
+.dot{width:9px;height:9px;border-radius:50%;background:var(--track)}
+.live .dot{background:var(--live);animation:pulse 1s steps(2,end) infinite}
+.live .state{color:var(--live)}
+@keyframes pulse{50%{opacity:.35}}
+@media (prefers-reduced-motion: reduce){.live .dot{animation:none}}
+.time{font-family:var(--mono);font-size:64px;font-weight:500;line-height:1;font-variant-numeric:tabular-nums;letter-spacing:-.02em}
+.bar{width:100%;height:6px;background:var(--track);border-radius:3px;overflow:hidden}
+.bar>i{display:block;height:100%;width:0;background:var(--accent)}
+.live .bar>i{background:var(--live)}
+.meta{font-family:var(--mono);font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums}
+.btns{display:flex;gap:10px;width:100%}
+button{font:inherit;font-weight:600;border-radius:8px;border:1px solid var(--line);background:var(--panel);color:var(--ink);padding:14px 16px;cursor:pointer;flex:1;min-height:52px}
+button.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink);font-size:17px}
+.live button.primary{background:var(--live);border-color:var(--live)}
+button:focus-visible,select:focus-visible,input:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+button:disabled{opacity:.45;cursor:default}
+.field{display:flex;flex-direction:column;gap:6px}
+.field+.field{margin-top:16px}
+label,.lbl{font-size:12px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+select{font:inherit;padding:11px 12px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--ink);width:100%}
+.hint{font-size:13px;color:var(--muted);margin:0}
+.row{display:flex;align-items:center;gap:12px}
+input[type=range]{flex:1;accent-color:var(--accent);height:28px}
+.vol{font-family:var(--mono);font-variant-numeric:tabular-nums;width:3.5ch;text-align:right}
+.seg{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+.seg button{padding:10px;min-height:44px;font-weight:500}
+.seg button[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.notice{background:var(--warn-bg);color:var(--warn);border-radius:8px;padding:10px 12px;font-size:13px;margin:0}
+.log{display:grid;grid-template-columns:repeat(7,1fr);gap:6px;margin-top:8px}
+.day{display:flex;flex-direction:column;align-items:center;gap:4px;font-family:var(--mono);font-size:11px;color:var(--muted)}
+.day b{display:block;width:100%;height:40px;border-radius:4px;background:var(--track);position:relative;overflow:hidden}
+.day b>s{position:absolute;left:0;right:0;bottom:0;background:var(--accent);text-decoration:none}
+.day.today{color:var(--ink);font-weight:500}
+.spec{font-family:var(--mono);font-size:12px;color:var(--muted);display:grid;grid-template-columns:auto 1fr;gap:2px 14px;margin:0}
+.spec dt{color:var(--muted)} .spec dd{margin:0;color:var(--ink)}
+details summary{cursor:pointer;font-weight:600}
+details ul{padding-left:18px;margin:10px 0 0;display:flex;flex-direction:column;gap:6px;font-size:14px}
+</style>
+</head>
+<body>
+
+<div class="wrap" id="app">
+  <header>
+    <h1>40 Hz Sound Session</h1>
+    <p class="sub">Auditory gamma stimulus · 40 pips/s · daily 60 min</p>
+  </header>
+
+  <section class="panel readout" id="readout" aria-live="polite">
+    <div class="state"><span class="dot"></span><span id="stateTxt">Ready</span></div>
+    <div class="time" id="time">60:00</div>
+    <div class="bar"><i id="bar"></i></div>
+    <div class="meta" id="meta">0 of 60 min</div>
+    <div class="btns">
+      <button class="primary" id="startBtn">Start session</button>
+    </div>
+    <p class="notice" id="pausedNote" hidden>Sound was paused (for example by a call or another app). The timer is paused too. Tap <b>Resume</b> here or on the lock screen.</p>
+  </section>
+
+  <section class="panel">
+    <div class="field">
+      <span class="lbl" id="stimLbl">Stimulus</span>
+      <select id="stim" aria-labelledby="stimLbl">
+        <option value="t10k">10 kHz tone pip, 1 ms (Martorell 2019)</option>
+        <option value="click">Broadband click, 0.1 ms</option>
+        <option value="t1k">1 kHz tone pip, 1 ms (lower pitch)</option>
+      </select>
+      <p class="hint" id="stimHint">The published mouse protocol. If it sounds faint or thin to you, switch to the click.</p>
+    </div>
+    <div class="field">
+      <label for="vol">Volume</label>
+      <div class="row">
+        <input type="range" id="vol" min="0" max="100" step="1" value="45">
+        <span class="vol" id="volTxt">45</span>
+        <button id="testBtn" style="flex:0 0 auto;min-height:44px;padding:8px 14px">Test 3 s</button>
+      </div>
+      <p class="hint">Set it with Test before you start, aiming for comfortable conversation level. During a session, use the phone's volume buttons; slider changes apply at the next minute.</p>
+    </div>
+    <div class="field">
+      <span class="lbl">Session length</span>
+      <div class="seg" id="lenSeg">
+        <button data-min="30" aria-pressed="false">30 min</button>
+        <button data-min="45" aria-pressed="false">45 min</button>
+        <button data-min="60" aria-pressed="true">60 min</button>
+      </div>
+    </div>
+  </section>
+
+  <section class="panel">
+    <span class="lbl">Last 7 days (minutes, this phone)</span>
+    <div class="log" id="log"></div>
+  </section>
+
+  <section class="panel">
+    <dl class="spec">
+      <dt>Rate</dt><dd>40.000 Hz (25 ms period)</dd>
+      <dt>Pip</dt><dd id="specPip">10 kHz sine, 1 ms, cosine-ramped</dd>
+      <dt>Timing</dt><dd>Sample-exact audio at 48 kHz, 1-min segments</dd>
+      <dt>Channels</dt><dd>Same signal both ears</dd>
+      <dt>Ramps</dt><dd>3 s fade in, 1.5 s fade out</dd>
+    </dl>
+  </section>
+
+  <section class="panel">
+    <details>
+      <summary>Using it on your phone</summary>
+      <ul>
+        <li>You can lock the phone once the session starts. It plays like a podcast, shows on the lock screen with pause and play, and stops by itself at the end.</li><li>Open this page in Safari or Chrome for that. Some in-app browsers, including the one inside the Claude app, may stop sound on lock.</li><li>A call or another app's audio pauses the session. The timer counts only minutes actually played.</li>
+        <li>If you hear nothing, check the media volume and that another app is not holding the audio.</li>
+        <li>Headphones or the phone speaker both work. This is not a binaural beat.</li>
+        <li>The sound is not phase-locked to your LED display. Both run at 40 Hz independently.</li>
+        <li>Stay awake and attentive. The 40 Hz brain response is strongest in wakefulness.</li>
+      </ul>
+    </details>
+  </section>
+</div>
+
+<audio id="player" preload="auto" playsinline></audio>
+<audio id="tester" preload="auto" playsinline></audio>
+<script>
+(function(){
+  const $ = id => document.getElementById(id);
+  const SR = 48000;           // 48 kHz: exactly 1200 samples per 25 ms cycle
+  const SEG = 60;             // each audio segment is 60 s = 2400 cycles
+  const STIM = {
+    t10k:{spec:"10 kHz sine, 1 ms, cosine-ramped",hint:"The published mouse protocol. If it sounds faint or thin to you, switch to the click."},
+    click:{spec:"Rectangular click, 0.1 ms (broadband)",hint:"Broad-spectrum click, as used in clinical 40 Hz auditory steady-state testing. Less dependent on high-frequency hearing."},
+    t1k:{spec:"1 kHz sine, 1 ms, cosine-ramped",hint:"Lower-pitched pip for anyone with high-frequency hearing loss."}
+  };
+  const player=$("player"), tester=$("tester");
+  let running=false, paused=false, durMin=60, segIdx=0, tick=null, wakeLock=null;
+  let urls={first:null,mid:null,last:null,test:null}, builtFor="";
+
+  const store = {
+    get(){ try{ return JSON.parse(localStorage.getItem("g40log")||"{}"); }catch(e){ return {}; } },
+    add(min){ try{ const d=this.get(); const k=dayKey(new Date()); d[k]=Math.round(((d[k]||0)+min)*10)/10; localStorage.setItem("g40log",JSON.stringify(d)); }catch(e){} },
+    prefs(){ try{ return JSON.parse(localStorage.getItem("g40prefs")||"{}"); }catch(e){ return {}; } },
+    savePrefs(p){ try{ localStorage.setItem("g40prefs",JSON.stringify(p)); }catch(e){} }
+  };
+  function dayKey(d){ return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0"); }
+
+  // One 25 ms cycle (1200 samples) of the chosen pip.
+  function cycle(kind){
+    const c=new Float32Array(SR/40), f=kind==="t1k"?1000:10000;
+    if(kind==="click"){ const n=Math.round(0.0001*SR); for(let i=0;i<n;i++) c[i]=0.9; }
+    else{
+      const n=Math.round(0.001*SR), ramp=0.12;
+      for(let i=0;i<n;i++){
+        const p=i/n; let env=1;
+        if(p<ramp) env=0.5*(1-Math.cos(Math.PI*p/ramp));
+        else if(p>1-ramp) env=0.5*(1-Math.cos(Math.PI*(1-p)/ramp));
+        c[i]=0.9*env*Math.sin(2*Math.PI*f*i/SR);
+      }
+    }
+    return c;
+  }
+  // Build a WAV (16-bit mono) of `secs` seconds with optional baked-in fades.
+  function wav(kind, gain, secs, fadeIn, fadeOut){
+    const c=cycle(kind), N=secs*SR, buf=new ArrayBuffer(44+N*2), v=new DataView(buf);
+    const w=(o,s)=>{ for(let i=0;i<s.length;i++) v.setUint8(o+i,s.charCodeAt(i)); };
+    w(0,"RIFF"); v.setUint32(4,36+N*2,true); w(8,"WAVE"); w(12,"fmt ");
+    v.setUint32(16,16,true); v.setUint16(20,1,true); v.setUint16(22,1,true);
+    v.setUint32(24,SR,true); v.setUint32(28,SR*2,true); v.setUint16(32,2,true); v.setUint16(34,16,true);
+    w(36,"data"); v.setUint32(40,N*2,true);
+    const fi=fadeIn*SR, fo=fadeOut*SR, L=c.length;
+    for(let i=0;i<N;i++){
+      let s=c[i%L]; if(s===0){ v.setInt16(44+i*2,0,true); continue; }
+      let g=gain;
+      if(fi && i<fi) g*=i/fi;
+      if(fo && i>N-fo) g*=(N-i)/fo;
+      v.setInt16(44+i*2, Math.round(s*g*32767), true);
+    }
+    return URL.createObjectURL(new Blob([buf],{type:"audio/wav"}));
+  }
+  function level(){ const x=+$("vol").value/100; return x*x; }
+  function build(){
+    const key=$("stim").value+"|"+$("vol").value;
+    if(key===builtFor) return;
+    Object.values(urls).forEach(u=>u&&URL.revokeObjectURL(u));
+    const k=$("stim").value, g=level();
+    urls={ first:wav(k,g,SEG,3,0), mid:wav(k,g,SEG,0,0), last:wav(k,g,SEG,0,1.5), test:wav(k,g,3,0.2,0.4) };
+    builtFor=key;
+  }
+  function segUrl(i){ return i===durMin-1 ? urls.last : i===0 ? urls.first : urls.mid; }
+
+  async function lockScreen(){ try{ if("wakeLock" in navigator && !document.hidden) wakeLock=await navigator.wakeLock.request("screen"); }catch(e){} }
+  function unlockScreen(){ try{ wakeLock&&wakeLock.release(); }catch(e){} wakeLock=null; }
+
+  function elapsed(){ return segIdx*SEG + Math.min(SEG, player.currentTime||0); }
+
+  function playSeg(){ player.src=segUrl(segIdx); player.currentTime=0; return player.play(); }
+
+  async function start(){
+    build(); tester.pause();
+    running=true; paused=false; segIdx=0;
+    setUI();
+    try{ await playSeg(); }catch(e){ running=false; setUI(); $("stateTxt").textContent="Tap Start again to allow sound"; return; }
+    mediaSession(); lockScreen();
+    clearInterval(tick); tick=setInterval(update,250); update();
+  }
+  function finish(completed){
+    const mins = completed ? durMin : elapsed()/60;
+    running=false; paused=false; clearInterval(tick); unlockScreen();
+    player.pause(); player.removeAttribute("src"); player.load();
+    if(mins>=0.5) store.add(mins);
+    setUI(); renderLog();
+    $("stateTxt").textContent = completed ? "Session complete" : "Stopped";
+    $("time").textContent = fmt(durMin*60);
+    $("bar").style.width = completed ? "100%" : "0";
+    $("meta").textContent = completed ? durMin+" min logged" : (mins>=0.5? mins.toFixed(1)+" min logged" : "Not logged (under 30 s)");
+    try{ navigator.mediaSession.playbackState="none"; }catch(e){}
+  }
+  async function resume(){
+    try{ await player.play(); }catch(e){ return; }
+    paused=false; lockScreen(); setUI(); update();
+  }
+
+  // Next minute starts as soon as the previous one ends. Media events keep
+  // firing with the screen locked, so the session continues and still stops on time.
+  player.addEventListener("ended", ()=>{
+    if(!running) return;
+    segIdx++;
+    if(segIdx>=durMin){ finish(true); return; }
+    build();            // picks up a volume or stimulus change at the minute boundary
+    playSeg().catch(()=>{ paused=true; setUI(); });
+  });
+  player.addEventListener("pause", ()=>{
+    if(running && !player.ended && player.currentTime>0){ paused=true; setUI(); update(); }
+  });
+  player.addEventListener("play", ()=>{ if(running && paused){ paused=false; setUI(); } });
+
+  function mediaSession(){
+    if(!("mediaSession" in navigator)) return;
+    try{
+      navigator.mediaSession.metadata = new MediaMetadata({title:"40 Hz Sound Session", artist:durMin+" min · "+$("stim").selectedOptions[0].text});
+      navigator.mediaSession.setActionHandler("play", ()=>resume());
+      navigator.mediaSession.setActionHandler("pause", ()=>player.pause());
+      navigator.mediaSession.setActionHandler("stop", ()=>finish(false));
+      ["seekbackward","seekforward","previoustrack","nexttrack","seekto"].forEach(a=>{ try{ navigator.mediaSession.setActionHandler(a,null); }catch(e){} });
+      navigator.mediaSession.playbackState="playing";
+    }catch(e){}
+  }
+
+  function fmt(s){ s=Math.max(0,Math.ceil(s)); return String(Math.floor(s/60)).padStart(2,"0")+":"+String(s%60).padStart(2,"0"); }
+  function update(){
+    if(!running) return;
+    const e=elapsed(), total=durMin*60;
+    $("time").textContent=fmt(total-e);
+    $("bar").style.width=(Math.min(1,e/total)*100).toFixed(2)+"%";
+    $("meta").textContent=Math.floor(e/60)+" of "+durMin+" min";
+  }
+  function setUI(){
+    $("app").classList.toggle("live", running&&!paused);
+    $("pausedNote").hidden = !paused;
+    $("startBtn").textContent = !running ? "Start session" : paused ? "Resume" : "Stop";
+    $("stateTxt").textContent = !running ? "Ready" : paused ? "Paused" : "Stimulating · 40 Hz";
+    $("testBtn").disabled = running;
+    document.querySelectorAll("#lenSeg button").forEach(x=>x.disabled=running);
+    try{ if(running) navigator.mediaSession.playbackState = paused?"paused":"playing"; }catch(e){}
+  }
+
+  $("startBtn").addEventListener("click", ()=>{ if(!running) start(); else if(paused) resume(); else finish(false); });
+  $("testBtn").addEventListener("click", ()=>{
+    if(running) return; build(); tester.src=urls.test; tester.currentTime=0; tester.play().catch(()=>{});
+  });
+  $("vol").addEventListener("input", ()=>{ $("volTxt").textContent=$("vol").value; savePrefs(); });
+  $("stim").addEventListener("change", ()=>{
+    const k=$("stim").value; $("specPip").textContent=STIM[k].spec; $("stimHint").textContent=STIM[k].hint; savePrefs();
+  });
+  document.querySelectorAll("#lenSeg button").forEach(btn=>btn.addEventListener("click",()=>{
+    durMin=+btn.dataset.min;
+    document.querySelectorAll("#lenSeg button").forEach(x=>x.setAttribute("aria-pressed", x===btn?"true":"false"));
+    $("time").textContent=fmt(durMin*60); $("meta").textContent="0 of "+durMin+" min"; $("bar").style.width="0";
+    savePrefs();
+  }));
+  document.addEventListener("visibilitychange", ()=>{ if(!document.hidden){ if(running&&!paused) lockScreen(); update(); } });
+
+  function savePrefs(){ store.savePrefs({vol:$("vol").value, stim:$("stim").value, dur:durMin}); }
+  function renderLog(){
+    const d=store.get(), el=$("log"); el.innerHTML="";
+    const names=["Su","Mo","Tu","We","Th","Fr","Sa"];
+    for(let i=6;i>=0;i--){
+      const dt=new Date(); dt.setDate(dt.getDate()-i);
+      const m=d[dayKey(dt)]||0, pct=Math.min(100,m/60*100);
+      const div=document.createElement("div"); div.className="day"+(i===0?" today":"");
+      div.innerHTML='<b title="'+m+' min"><s style="height:'+pct+'%"></s></b><span>'+names[dt.getDay()]+'</span><span>'+Math.round(m)+'</span>';
+      el.appendChild(div);
+    }
+  }
+  (function init(){
+    const p=store.prefs();
+    if(p.vol){ $("vol").value=p.vol; $("volTxt").textContent=p.vol; }
+    if(p.stim && STIM[p.stim]){ $("stim").value=p.stim; $("specPip").textContent=STIM[p.stim].spec; $("stimHint").textContent=STIM[p.stim].hint; }
+    if(p.dur){ const b=document.querySelector('#lenSeg button[data-min="'+p.dur+'"]'); if(b) b.click(); }
+    renderLog();
+  })();
+})();
+</script>
+
+</body>
+</html>
