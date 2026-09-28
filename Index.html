@@ -791,12 +791,16 @@ button.film-open{font-size:15px}
   }
   function stopFlash(msg){ fl.mode="off"; flashEl.style.opacity="0"; setFlashBtn(); flashMsg(msg||""); }
   function median(a){ const b=a.slice().sort((x,y)=>x-y); return b[b.length>>1]; }
+  // Safari rounds frame timestamps to whole milliseconds, so an 80 Hz frame (12.5 ms)
+  // reads as 12 or 13 and a median lands on 83 Hz. Average instead, leaving out
+  // dropped frames (much longer than typical) so they don't drag the rate down.
+  function rate(a){ const m=median(a), ok=a.filter(x=>x<m*1.5); return ok.length/ok.reduce((x,y)=>x+y,0); }
   function flickerFrame(dt){
     if(fl.mode==="off") return;
     if(dt>0) fl.samples.push(dt);
     if(fl.mode==="measuring"){
       if(fl.samples.length<60) return;
-      const hz=1/median(fl.samples), fpc=Math.round(hz/40);
+      const hz=rate(fl.samples), fpc=Math.round(hz/40);
       fl.samples=[];
       if(fpc>=2 && Math.abs(hz-fpc*40)<=fpc*40*.04){
         fl.hz=fpc*40; fl.fpc=fpc; fl.on=Math.max(1,Math.floor(fpc/2)); fl.n=0; fl.mode="on";
@@ -810,7 +814,7 @@ button.film-open{font-size:15px}
     flashEl.style.opacity = (fl.n % fl.fpc) < fl.on ? "0.5" : "0";
     fl.n++;
     if(fl.samples.length>=45){
-      const hz=1/median(fl.samples); fl.samples=[];
+      const hz=rate(fl.samples); fl.samples=[];
       if(Math.abs(hz-fl.hz)>fl.hz*.05) stopFlash("The screen's frame rate changed (for example Low Power Mode), so the flash was stopped to avoid flickering at the wrong frequency.");
     }
   }
