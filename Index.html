@@ -419,7 +419,7 @@ button.film-open{font-size:15px}
      p:"Keep your eyes open and stay alert: gamma responses are strongest when you are awake and paying attention. Most of this evidence is from mice and human trials are ongoing, so treat this as learning, not treatment.",
      s:"Watch it loop, or just listen"}
   ];
-  let fOpen=false, fPlaying=true, scene=0, u=0, lastTs=0, raf=0, dirty=true, filmLock=null;
+  let fOpen=false, fPlaying=true, scene=0, u=0, lastTs=0, lastDraw=0, raf=0, dirty=true, filmLock=null;
   let cw=0, ch=0, dpr=1, sc=1, ox=0, oy=0, flow=0, flowA=0;
 
   // Small deterministic helpers
@@ -770,10 +770,13 @@ button.film-open{font-size:15px}
   function frame(ts){
     if(!fOpen) return;
     raf=requestAnimationFrame(frame);
-    const dt=lastTs?Math.min(.1,(ts-lastTs)/1000):0; lastTs=ts;
-    flickerFrame(dt);
+    const dtMs=lastTs?ts-lastTs:0, dt=Math.min(.1,dtMs/1000); lastTs=ts;
+    flickerFrame(dtMs,ts);
     if(fPlaying){ u+=dt; if(u>=SCENES[scene].d) goScene(scene+1); }
-    if(fPlaying||dirty){ draw(fPlaying?dt:0); dirty=false; }
+    // While the flash is checked or running, redraw the video at ~30 fps so drawing
+    // never makes the phone skip the refresh ticks the flash depends on.
+    const light = fl.mode!=="off" && ts-lastDraw<30;
+    if((fPlaying||dirty) && !light){ draw(fPlaying?Math.min(.1,(ts-lastDraw)/1000):0); dirty=false; lastDraw=ts; }
     miniStatus();
   }
 
@@ -782,7 +785,7 @@ button.film-open{font-size:15px}
      a refresh rate that is a whole multiple of 40 (80, 120, 160, 240 Hz).
      At 60 Hz a 40 Hz on/off pattern aliases to 20 Hz, the wrong frequency and
      the band most likely to provoke photosensitive seizures, so we refuse it. */
-  let fl={mode:"off", hz:0, fpc:0, on:1, n:0, samples:[]};
+  let fl={mode:"off", hz:0, fpc:0, on:1, P:0, t0:0, samples:[]};
   function flashMsg(t){ $("flashMsg").hidden=!t; $("flashMsg").textContent=t||""; }
   function setFlashBtn(){
     const on=fl.mode==="on", b=$("fFlash");
@@ -790,32 +793,40 @@ button.film-open{font-size:15px}
     b.textContent= fl.mode==="measuring"?"Checking screen…" : on?"40 Hz flash: on":"40 Hz flash: off";
   }
   function stopFlash(msg){ fl.mode="off"; flashEl.style.opacity="0"; setFlashBtn(); flashMsg(msg||""); }
-  function median(a){ const b=a.slice().sort((x,y)=>x-y); return b[b.length>>1]; }
-  // Safari rounds frame timestamps to whole milliseconds, so an 80 Hz frame (12.5 ms)
-  // reads as 12 or 13 and a median lands on 83 Hz. Average instead, leaving out
-  // dropped frames (much longer than typical) so they don't drag the rate down.
-  function rate(a){ const m=median(a), ok=a.filter(x=>x<m*1.5); return ok.length/ok.reduce((x,y)=>x+y,0); }
-  function flickerFrame(dt){
+  // Frame intervals (ms) → the screen's refresh period and how many ticks were missed.
+  // The fastest intervals give the refresh period (a busy page skips ticks, which only
+  // makes some intervals longer); Safari rounds timestamps to whole ms, hence the tolerance.
+  function analyse(a){
+    const b=a.slice().sort((x,y)=>x-y), fast=b[Math.floor(b.length*.2)];
+    const fpc=Math.round(1000/fast/40), P=fpc>=1?25/fpc:fast;
+    let ticks=0; a.forEach(d=>{ ticks+=Math.max(1,Math.round(d/P)); });
+    return {fast, fpc, P, avg:1000*a.length/a.reduce((x,y)=>x+y,0), skipped:1-a.length/ticks,
+            exact:fpc>=2 && Math.abs(1000/fast-fpc*40)<=fpc*40*.07};
+  }
+  function flickerFrame(dtMs,ts){
     if(fl.mode==="off") return;
-    if(dt>0) fl.samples.push(dt);
+    if(dtMs>0 && dtMs<100) fl.samples.push(dtMs);
     if(fl.mode==="measuring"){
-      if(fl.samples.length<60) return;
-      const hz=rate(fl.samples), fpc=Math.round(hz/40);
-      fl.samples=[];
-      if(fpc>=2 && Math.abs(hz-fpc*40)<=fpc*40*.04){
-        fl.hz=fpc*40; fl.fpc=fpc; fl.on=Math.max(1,Math.floor(fpc/2)); fl.n=0; fl.mode="on";
-        setFlashBtn(); flashMsg("Screen refreshes at "+fl.hz+" Hz, so each flash cycle is exactly "+fpc+" frames = 25 ms (40 Hz). The flash is not phase-locked to the sound.");
+      if(fl.samples.length<90) return;
+      const r=analyse(fl.samples); fl.samples=[];
+      if(r.exact && r.skipped<=.1){
+        fl.fpc=r.fpc; fl.hz=r.fpc*40; fl.P=r.P; fl.on=Math.max(1,Math.floor(r.fpc/2)); fl.t0=ts; fl.mode="on";
+        setFlashBtn(); flashMsg("Screen refreshes at "+fl.hz+" Hz, so each flash cycle is exactly "+r.fpc+" frames = 25 ms (40 Hz). The video redraws less often while the flash runs, to keep the timing steady. Tap to dismiss.");
+      } else if(r.exact){
+        stopFlash("Screen refreshes at "+r.fpc*40+" Hz, but the phone skipped "+Math.round(r.skipped*100)+"% of frames, so the flash would not be a clean 40 Hz. Open the page in Safari itself (compass icon), tap Pause video, then try again. Tap to dismiss.");
       } else {
-        stopFlash("Screen is running at "+Math.round(hz)+" fps here. An exact 40 Hz flash needs 80, 120 or 160 fps; at "+Math.round(hz)+" it would flicker at "+(Math.round(hz)===60?"20 Hz":"an uneven rate")+" instead, so it stays off. iPhone Pro tip: see “Using it on your phone”. Tap to dismiss.");
+        const hz=Math.round(r.avg);
+        stopFlash("Screen is running at about "+hz+" fps here. An exact 40 Hz flash needs 80, 120 or 160; at "+hz+" it would flicker at "+(Math.abs(hz-60)<4?"20 Hz":"an uneven rate")+", so it stays off. iPhone Pro tip: see “Using it on your phone”. Tap to dismiss.");
       }
       return;
     }
-    // on: advance exactly one step per displayed frame
-    flashEl.style.opacity = (fl.n % fl.fpc) < fl.on ? "0.5" : "0";
-    fl.n++;
-    if(fl.samples.length>=45){
-      const hz=rate(fl.samples); fl.samples=[];
-      if(Math.abs(hz-fl.hz)>fl.hz*.05) stopFlash("The screen's frame rate changed (for example Low Power Mode), so the flash was stopped to avoid flickering at the wrong frequency.");
+    // on: phase comes from the clock, so a skipped frame never stretches a cycle
+    const k=Math.round((ts-fl.t0)/fl.P);
+    flashEl.style.opacity = (k % fl.fpc) < fl.on ? "0.5" : "0";
+    if(fl.samples.length>=90){
+      const r=analyse(fl.samples); fl.samples=[];
+      if(!r.exact || r.fpc!==fl.fpc) stopFlash("The screen's frame rate changed (for example Low Power Mode), so the flash was stopped to avoid flickering at the wrong frequency.");
+      else if(r.skipped>.15) stopFlash("The phone started skipping frames ("+Math.round(r.skipped*100)+"%), so the flash was stopped. Tap Pause video and try again.");
     }
   }
   $("fFlash").addEventListener("click",()=>{
