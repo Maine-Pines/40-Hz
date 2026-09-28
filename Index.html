@@ -79,6 +79,33 @@ input[type=range]{flex:1;accent-color:var(--accent);height:28px}
 .spec dt{color:var(--muted)} .spec dd{margin:0;color:var(--ink)}
 details summary{cursor:pointer;font-weight:600}
 details ul{padding-left:18px;margin:10px 0 0;display:flex;flex-direction:column;gap:6px;font-size:14px}
+button.film-open{font-size:15px}
+
+/* Video view: always dark, like a video player */
+.film{position:fixed;inset:0;z-index:50;background:#05090D;color:#E4EAEE;display:flex;flex-direction:column;gap:8px;
+  padding:max(12px,env(safe-area-inset-top)) max(16px,env(safe-area-inset-right)) max(12px,env(safe-area-inset-bottom)) max(16px,env(safe-area-inset-left))}
+.film-top{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.film-top h2{font-size:16px;font-weight:600;margin:0;flex:1;white-space:nowrap}
+.chip{font-family:var(--mono);font-size:11px;color:#93A1AC;border:1px solid #2A3743;border-radius:999px;padding:3px 8px}
+.stage{position:relative;flex:1;min-height:180px}
+.stage canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
+.dots{display:flex;justify-content:center}
+.film .dots button{flex:0 0 auto;min-height:30px;width:30px;padding:0;border:0;background:transparent}
+.film .dots button::after{content:"";display:block;width:8px;height:8px;margin:auto;border-radius:50%;background:#2A3743}
+.film .dots button[aria-current="true"]::after{background:#F0973F}
+.cap{min-height:8.9em;max-width:560px;margin:0 auto;width:100%}
+.cap h3{font-size:15px;font-weight:600;margin:0 0 3px}
+.cap p{margin:0;font-size:14px;line-height:1.45;color:#C9D3DA}
+.cap small{display:block;margin-top:4px;font-family:var(--mono);font-size:11px;color:#93A1AC}
+.fsess{display:flex;justify-content:space-between;font-family:var(--mono);font-size:12px;color:#93A1AC;font-variant-numeric:tabular-nums;max-width:560px;margin:0 auto;width:100%}
+.fsess.on{color:#F0973F}
+.fgrid{display:grid;grid-template-columns:1fr 1fr;gap:8px;max-width:560px;margin:0 auto;width:100%}
+.film button{background:#172129;border-color:#2A3743;color:#E4EAEE;min-height:46px;padding:10px 12px;font-size:14px}
+.film button.on{background:#F0973F;border-color:#F0973F;color:#0B1216}
+.film button:focus-visible{outline-color:#5FA9C9}
+.fnote{background:#2E2511;color:#F2C766;border-radius:8px;padding:10px 12px;font-size:13px;margin:0 auto;max-width:560px;width:100%}
+.fnote .row{margin-top:8px;gap:8px}
+.flash{position:fixed;inset:0;z-index:60;background:#FFFFFF;opacity:0;pointer-events:none}
 </style>
 </head>
 <body>
@@ -96,6 +123,9 @@ details ul{padding-left:18px;margin:10px 0 0;display:flex;flex-direction:column;
     <div class="meta" id="meta">0 of 60 min</div>
     <div class="btns">
       <button class="primary" id="startBtn">Start session</button>
+    </div>
+    <div class="btns">
+      <button class="film-open" id="filmBtn">▶ Watch how 40 Hz works</button>
     </div>
     <p class="notice" id="pausedNote" hidden>Sound was paused (for example by a call or another app). The timer is paused too. Tap <b>Resume</b> here or on the lock screen.</p>
   </section>
@@ -152,11 +182,36 @@ details ul{padding-left:18px;margin:10px 0 0;display:flex;flex-direction:column;
         <li>If you hear nothing, check the media volume and that another app is not holding the audio.</li>
         <li>Headphones or the phone speaker both work. This is not a binaural beat.</li>
         <li>The sound is not phase-locked to your LED display. Both run at 40 Hz independently.</li>
+        <li><b>Watch how 40 Hz works</b> opens a looping animation of what the rhythm does in the brain. The sound keeps playing while you watch, and the screen stays on.</li>
+        <li>The optional 40 Hz screen flash only turns on if the screen refreshes at a multiple of 40 (80, 120, 160 Hz). Safari on iPhone normally limits pages to 60 fps, where a true 40 Hz flash is impossible (it would come out as 20 Hz). On a ProMotion iPhone (Pro models) you can try: Settings › Apps › Safari › Advanced › Feature Flags › turn off “Prefer Page Rendering Updates near 60fps”, and turn off Low Power Mode. Do not use the flash if you have epilepsy or light-triggered migraines.</li>
         <li>Stay awake and attentive. The 40 Hz brain response is strongest in wakefulness.</li>
       </ul>
     </details>
   </section>
 </div>
+
+<div class="film" id="film" hidden role="dialog" aria-modal="true" aria-labelledby="filmTitle">
+  <div class="film-top">
+    <h2 id="filmTitle">How 40 Hz works</h2>
+    <span class="chip">Animation slowed 20× · sound is real 40 Hz</span>
+  </div>
+  <div class="stage" id="stage"><canvas id="cv" aria-hidden="true"></canvas></div>
+  <div class="dots" id="dots"></div>
+  <div class="cap" aria-live="polite"><h3 id="capT"></h3><p id="capP"></p><small id="capS"></small></div>
+  <div class="fnote" id="flashWarn" hidden>
+    <b>Flashing light warning.</b> Do not use the flash if you have epilepsy, have ever had a seizure, or get migraines from flicker. Stop if you feel unwell.
+    <div class="row"><button id="flashOk">Turn on flash</button><button id="flashNo">Cancel</button></div>
+  </div>
+  <p class="fnote" id="flashMsg" hidden></p>
+  <div class="fsess" id="fsess"><span id="fState">Sound off</span><span id="fTime"></span></div>
+  <div class="fgrid">
+    <button id="fStart">Start sound</button>
+    <button id="fClose">Back to controls</button>
+    <button id="fPlay">Pause video</button>
+    <button id="fFlash" aria-pressed="false">40 Hz flash: off</button>
+  </div>
+</div>
+<div class="flash" id="flash"></div>
 
 <audio id="player" preload="auto" playsinline></audio>
 <audio id="tester" preload="auto" playsinline></audio>
@@ -337,6 +392,468 @@ details ul{padding-left:18px;margin:10px 0 0;display:flex;flex-direction:column;
     if(p.dur){ const b=document.querySelector('#lenSeg button[data-min="'+p.dur+'"]'); if(b) b.click(); }
     renderLog();
   })();
+
+  /* ---------- Video view: looping animation of what 40 Hz does ---------- */
+  const film=$("film"), cv=$("cv"), ctx=cv.getContext("2d"), flashEl=$("flash");
+  const F=2;                  // pulses per second shown (real 40 Hz slowed 20x)
+  const VW=400, VH=440;       // virtual drawing box
+  const ORANGE=[240,151,63], CYAN=[95,169,201], VIOLET=[155,140,255], AMBER=[222,170,70],
+        GREEN=[127,214,160], BLUE=[88,180,255], RED=[214,78,88], PINK=[240,120,190], WHITE=[230,238,242];
+  const SCENES=[
+    {d:12, t:"1 · The sound travels in",
+     p:"Each click bends hair cells in the cochlea. The signal climbs through the brainstem and thalamus to the auditory cortex in a few tens of milliseconds, 40 times every second.",
+     s:"Ascending auditory pathway"},
+    {d:14, t:"2 · The cortex locks to the beat",
+     p:"Fast-spiking PV interneurons fire on each click and briefly silence their neighbours. Pyramidal neurons then fire together in the gap. Scattered activity becomes one rhythm: a 40 Hz gamma oscillation.",
+     s:"Cardin et al. 2009; Sohal et al. 2009 (Nature)"},
+    {d:11, t:"3 · The rhythm spreads",
+     p:"In mice, 40 Hz sound drove gamma in auditory cortex and also in the hippocampus and prefrontal cortex, areas for memory and attention. How far it reaches in the human brain is still being studied.",
+     s:"Martorell et al. 2019 (Cell) · debated: Soula et al. 2023"},
+    {d:14, t:"4 · Microglia switch on",
+     p:"Microglia, the brain's immune cells, pull in their fine branches, grow larger and gather at amyloid plaques, taking amyloid up. Plaque load fell in treated mice.",
+     s:"Iaccarino et al. 2016 (Nature); Martorell et al. 2019 (Cell)"},
+    {d:14, t:"5 · The brain rinses itself",
+     p:"VIP interneurons release a signal that makes small arteries pulse harder. That pumps cerebrospinal fluid through the tissue via astrocyte water channels (AQP4), carrying amyloid out toward the veins.",
+     s:"Murdock et al. 2024 (Nature), in mice"},
+    {d:10, t:"6 · Stay with the rhythm",
+     p:"Keep your eyes open and stay alert: gamma responses are strongest when you are awake and paying attention. Most of this evidence is from mice and human trials are ongoing, so treat this as learning, not treatment.",
+     s:"Watch it loop, or just listen"}
+  ];
+  let fOpen=false, fPlaying=true, scene=0, u=0, lastTs=0, raf=0, dirty=true, filmLock=null;
+  let cw=0, ch=0, dpr=1, sc=1, ox=0, oy=0, flow=0, flowA=0;
+
+  // Small deterministic helpers
+  function hash(a,b){ let x=(Math.imul(a|0,374761393)+Math.imul(b|0,668265263))|0; x=Math.imul(x^(x>>>13),1274126177); x^=x>>>16; return (x>>>0)/4294967296; }
+  const clamp=(x,a,b)=>Math.min(b,Math.max(a,x));
+  const sm=(a,b,x)=>{ x=clamp((x-a)/(b-a),0,1); return x*x*(3-2*x); };
+  const fr=x=>x-Math.floor(x);
+  const lerp=(a,b,t)=>a+(b-a)*t;
+  const beat=x=>Math.exp(-fr(x*F)*7);
+  function vnoise(seed,x){ const i=Math.floor(x), f=x-i, s=f*f*(3-2*f); return lerp(hash(seed,i),hash(seed,i+1),s)*2-1; }
+  const rgba=(c,a)=>"rgba("+c[0]+","+c[1]+","+c[2]+","+a+")";
+  const sprites={};
+  function sprite(c){
+    const k=c.join(); if(sprites[k]) return sprites[k];
+    const s=document.createElement("canvas"); s.width=s.height=64;
+    const g=s.getContext("2d"), gr=g.createRadialGradient(32,32,0,32,32,32);
+    gr.addColorStop(0,rgba(c,1)); gr.addColorStop(.3,rgba(c,.45)); gr.addColorStop(1,rgba(c,0));
+    g.fillStyle=gr; g.fillRect(0,0,64,64); return sprites[k]=s;
+  }
+  function glow(x,y,r,c,a){
+    if(a<0.02) return;
+    ctx.globalCompositeOperation="lighter"; ctx.globalAlpha=Math.min(1,a);
+    ctx.drawImage(sprite(c),x-r,y-r,r*2,r*2);
+    ctx.globalAlpha=1; ctx.globalCompositeOperation="source-over";
+  }
+  function dot(x,y,r,col){ ctx.fillStyle=col; ctx.beginPath(); ctx.arc(x,y,r,0,Math.PI*2); ctx.fill(); }
+  function line(x1,y1,x2,y2){ ctx.beginPath(); ctx.moveTo(x1,y1); ctx.lineTo(x2,y2); ctx.stroke(); }
+  function label(t,x,y,al,col,font){
+    ctx.font=font||'500 13px "IBM Plex Sans",system-ui,sans-serif'; ctx.textAlign=al||"left";
+    ctx.lineJoin="round"; ctx.lineWidth=4; ctx.strokeStyle="rgba(5,9,13,.85)"; ctx.strokeText(t,x,y);
+    ctx.fillStyle=col||"rgba(201,211,218,.92)"; ctx.fillText(t,x,y);
+  }
+  const MONO='12px "IBM Plex Mono",ui-monospace,monospace';
+
+  // ---- Scene 1: pathway ear -> cortex
+  const NODES=[
+    {x:78,y:78,n:"Ear (cochlea)",lx:78,ly:44,al:"center"},
+    {x:200,y:150,n:"Brainstem",lx:224,ly:155,al:"left"},
+    {x:318,y:222,n:"Thalamus",lx:318,ly:258,al:"center"},
+    {x:200,y:294,n:"Auditory cortex",lx:176,ly:299,al:"right"},
+    {x:92,y:388,n:"Hippocampus",lx:92,ly:428,al:"center"},
+    {x:308,y:388,n:"Prefrontal cortex",lx:308,ly:428,al:"center"}
+  ];
+  function poly(ids){ const p=ids.map(i=>NODES[i]), L=[0]; for(let i=1;i<p.length;i++) L.push(L[i-1]+Math.hypot(p[i].x-p[i-1].x,p[i].y-p[i-1].y)); return {p,L,len:L[L.length-1]}; }
+  function at(pl,s){ for(let i=1;i<pl.p.length;i++){ if(s<=pl.L[i]){ const f=(s-pl.L[i-1])/(pl.L[i]-pl.L[i-1]); return [lerp(pl.p[i-1].x,pl.p[i].x,f),lerp(pl.p[i-1].y,pl.p[i].y,f)]; } } const q=pl.p[pl.p.length-1]; return [q.x,q.y]; }
+  const MAIN=poly([0,1,2,3]), BRA=poly([3,4]), BRB=poly([3,5]);
+  const NS=[0,MAIN.L[1],MAIN.L[2],MAIN.len,MAIN.len+BRA.len,MAIN.len+BRB.len];
+  function sPath(){
+    const SPD=230, RING=0.55;
+    // sound source + rings
+    ctx.fillStyle=rgba(WHITE,.75); ctx.fillRect(8,72,7,12);
+    ctx.beginPath(); ctx.moveTo(15,72); ctx.lineTo(24,63); ctx.lineTo(24,93); ctx.lineTo(15,84); ctx.fill();
+    label("40 clicks/s",8,114,"left","rgba(147,161,172,1)",MONO);
+    ctx.lineWidth=2;
+    for(let k=Math.floor((u-1)*F);k<=Math.floor(u*F);k++){
+      const r=(u-k/F)*105; if(r<0||r>58) continue;
+      ctx.strokeStyle=rgba(ORANGE,(1-r/58)*.9); ctx.beginPath(); ctx.arc(24,78,r,-.7,.7); ctx.stroke();
+    }
+    // wiring
+    ctx.strokeStyle=rgba(CYAN,.35); ctx.lineWidth=2;
+    [MAIN,BRA,BRB].forEach(pl=>{ ctx.beginPath(); pl.p.forEach((q,i)=>i?ctx.lineTo(q.x,q.y):ctx.moveTo(q.x,q.y)); ctx.stroke(); });
+    // pulses
+    const I=[0,0,0,0,0,0], dots=[];
+    for(let k=Math.floor((u-4)*F);k<=Math.floor(u*F);k++){
+      const s=(u-k/F-RING)*SPD; if(s<-20) continue;
+      NS.forEach((ns,j)=>{ I[j]+=Math.exp(-Math.pow((s-ns)/16,2)); });
+      if(s<0) continue;
+      if(s<=MAIN.len) dots.push(at(MAIN,s));
+      else { if(s-MAIN.len<=BRA.len) dots.push(at(BRA,s-MAIN.len)); if(s-MAIN.len<=BRB.len) dots.push(at(BRB,s-MAIN.len)); }
+    }
+    NODES.forEach((n,j)=>{
+      glow(n.x,n.y,44,ORANGE,I[j]*.9);
+      ctx.fillStyle="#0C1820"; ctx.strokeStyle=rgba(CYAN,.85); ctx.lineWidth=1.5;
+      ctx.beginPath(); ctx.arc(n.x,n.y,15,0,Math.PI*2); ctx.fill(); ctx.stroke();
+      if(j===0){ // cochlea spiral
+        ctx.strokeStyle=rgba(CYAN,.9); ctx.lineWidth=1.3; ctx.beginPath();
+        for(let a=0;a<4.4*Math.PI;a+=.2){ const r=1+a*.8; const x=n.x+Math.cos(a)*r, y=n.y+Math.sin(a)*r; a?ctx.lineTo(x,y):ctx.moveTo(x,y); }
+        ctx.stroke();
+      } else dot(n.x,n.y,3.5,rgba(CYAN,.9));
+      label(n.n,n.lx,n.ly,n.al);
+    });
+    dots.forEach(p=>{ glow(p[0],p[1],15,ORANGE,.9); dot(p[0],p[1],2.6,rgba(WHITE,1)); });
+  }
+
+  // ---- Scene 2: cortical microcircuit
+  const PYR=[[60,122],[122,112],[186,126],[252,114],[322,124],[90,184],[156,176],[222,188],[290,178],[350,186],[60,246],[126,254],[196,242],[266,254],[336,244]];
+  const PV=[[96,150],[206,154],[314,152],[162,216],[272,218]];
+  const PVN=PV.map(p=>PYR.map((q,i)=>[Math.hypot(p[0]-q[0],p[1]-q[1]),i]).sort((a,b)=>a[0]-b[0]).slice(0,4).map(x=>x[1]));
+  const E2=x=>sm(3,8,x);
+  function lastSpike(id,t,lockP,randP,phase,jit){
+    let best=-1e9; const b0=Math.floor(t/.3);
+    for(let b=b0-1;b<=b0;b++){ const bt=b*.3; if(hash(id*13+1,b)<randP*(1-E2(bt))){ const s=bt+hash(id*13+2,b)*.3; if(s<=t&&s>best) best=s; } }
+    const k0=Math.floor(t*F);
+    for(let k=k0-1;k<=k0;k++){ const ee=E2(k/F); if(hash(id*13+3,k)<ee*lockP){ const s=(k+phase+(hash(id*13+4,k)-.5)*(jit+.7*(1-ee)))/F; if(s<=t&&s>best) best=s; } }
+    return best;
+  }
+  function sCortex(){
+    const e=E2(u), PX=320/3;
+    // click strip
+    label("Clicks (slowed)",40,44,"left","rgba(147,161,172,1)",MONO);
+    ctx.strokeStyle=rgba(CYAN,.25); ctx.lineWidth=1; line(40,62,360,62);
+    ctx.strokeStyle=rgba(ORANGE,.9); ctx.lineWidth=2;
+    for(let k=Math.floor((u-3)*F);k<=Math.floor(u*F);k++){ const x=360-(u-k/F)*PX; if(x>=40) line(x,54,x,70); }
+    // PV spikes & wiring
+    const pvS=PV.map((p,j)=>lastSpike(100+j,u,.97,.35,.1,.04));
+    PV.forEach((p,j)=>{ const I=Math.exp(-(u-pvS[j])/.12); ctx.strokeStyle=rgba(VIOLET,.12+.5*I); ctx.lineWidth=1.2; PVN[j].forEach(i=>line(p[0],p[1],PYR[i][0],PYR[i][1])); });
+    // pyramidal cells
+    PYR.forEach((q,i)=>{
+      const I=Math.exp(-(u-lastSpike(i,u,.85,.45,.55,.1))/.09), x=q[0], y=q[1];
+      ctx.strokeStyle=rgba(CYAN,.6); ctx.lineWidth=1.3;
+      line(x,y-6,x,y-30); line(x-5,y+5,x-12,y+14); line(x+5,y+5,x+12,y+14);
+      glow(x,y,24,ORANGE,I);
+      ctx.beginPath(); ctx.moveTo(x,y-8); ctx.lineTo(x+7,y+5); ctx.lineTo(x-7,y+5); ctx.closePath();
+      ctx.fillStyle=I>.15?rgba(ORANGE,.35+.65*I):rgba(CYAN,.25); ctx.fill(); ctx.strokeStyle=rgba(CYAN,.9); ctx.stroke();
+    });
+    // PV cells + inhibition ring
+    PV.forEach((p,j)=>{
+      const dt=u-pvS[j], I=Math.exp(-dt/.1);
+      if(dt>0&&dt<.3){ ctx.strokeStyle=rgba(VIOLET,(1-dt/.3)*.55); ctx.lineWidth=2; ctx.beginPath(); ctx.arc(p[0],p[1],8+dt*170,0,Math.PI*2); ctx.stroke(); }
+      glow(p[0],p[1],20,VIOLET,I);
+      dot(p[0],p[1],6,rgba(VIOLET,.55+.45*I));
+    });
+    // legend
+    ctx.beginPath(); ctx.moveTo(44,280); ctx.lineTo(50,290); ctx.lineTo(38,290); ctx.closePath(); ctx.fillStyle=rgba(CYAN,.6); ctx.fill();
+    label("Pyramidal (excitatory)",56,290,"left");
+    dot(214,285,5,rgba(VIOLET,.9)); label("PV interneuron (inhibitory)",224,290,"left");
+    // LFP trace
+    const col=[0,1,2].map(i=>Math.round(lerp(CYAN[i],ORANGE[i],e)));
+    label("Local field potential",40,326,"left","rgba(147,161,172,1)",MONO);
+    label(e<.35?"scattered":e<.8?"locking in…":"40 Hz gamma",360,326,"right",rgba(col,1),MONO);
+    ctx.strokeStyle=rgba(col,.95); ctx.lineWidth=2; ctx.beginPath();
+    for(let px=0;px<=320;px+=2){
+      const tau=u-(320-px)/PX, ee=E2(tau);
+      const v=ee*Math.sin(2*Math.PI*(F*tau-.6))*.95+(1-ee)*(.6*vnoise(3,tau*4)+.4*vnoise(5,tau*11));
+      const y=375-v*30; px?ctx.lineTo(40+px,y):ctx.moveTo(40,y);
+    }
+    ctx.stroke();
+  }
+
+  // ---- Scene 3: brain-wide spread
+  function brainPath(){
+    ctx.beginPath(); ctx.moveTo(70,205);
+    ctx.bezierCurveTo(52,140,110,62,205,60); ctx.bezierCurveTo(290,58,352,110,350,175);
+    ctx.bezierCurveTo(349,215,330,238,300,242); ctx.bezierCurveTo(275,246,262,250,255,258);
+    ctx.bezierCurveTo(240,285,160,292,132,262); ctx.bezierCurveTo(105,262,78,245,70,205); ctx.closePath();
+  }
+  const REG=[{n:"AC",x:238,y:230,lag:0,c:ORANGE},{n:"HPC",x:178,y:244,lag:.35,c:GREEN},{n:"PFC",x:112,y:146,lag:.9,c:CYAN}];
+  function sBrain(){
+    const e=sm(2,7,u);
+    // brainstem + cerebellum
+    ctx.fillStyle="#0B141B"; ctx.strokeStyle=rgba(CYAN,.4); ctx.lineWidth=1.5;
+    ctx.beginPath(); ctx.moveTo(236,250); ctx.lineTo(262,250); ctx.lineTo(257,304); ctx.lineTo(243,304); ctx.closePath(); ctx.fill(); ctx.stroke();
+    ctx.beginPath(); ctx.ellipse(302,262,40,22,0,0,Math.PI*2); ctx.fill(); ctx.stroke();
+    ctx.strokeStyle=rgba(CYAN,.2); for(let i=-2;i<=2;i++){ ctx.beginPath(); ctx.ellipse(302,262+i*6,36-Math.abs(i)*6,3,0,0,Math.PI); ctx.stroke(); }
+    brainPath(); ctx.fillStyle="#0B141B"; ctx.fill(); ctx.strokeStyle=rgba(CYAN,.6); ctx.stroke();
+    ctx.save(); brainPath(); ctx.clip();
+    ctx.strokeStyle=rgba(CYAN,.25); ctx.lineWidth=1.5;
+    ctx.beginPath(); ctx.moveTo(126,222); ctx.quadraticCurveTo(190,198,272,214); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(214,60); ctx.quadraticCurveTo(206,122,190,200); ctx.stroke();
+    ctx.strokeStyle=rgba(CYAN,.12);
+    [[100,120,150,110,170,160],[250,90,290,120,300,170],[140,90,170,130,150,170],[260,150,300,190,330,200]].forEach(a=>{ ctx.beginPath(); ctx.moveTo(a[0],a[1]); ctx.quadraticCurveTo(a[2],a[3],a[4],a[5]); ctx.stroke(); });
+    // waves from auditory cortex
+    ctx.lineWidth=2.5;
+    for(let k=Math.floor((u-1.8)*F);k<=Math.floor(u*F);k++){
+      const r=(u-k/F)*170; if(r<0) continue;
+      ctx.strokeStyle=rgba(ORANGE,e*Math.max(0,1-r/290)*.6); ctx.beginPath(); ctx.arc(REG[0].x,REG[0].y,r,0,Math.PI*2); ctx.stroke();
+    }
+    ctx.restore();
+    REG.forEach((r,i)=>{
+      const I=e*beat(u-r.lag/F*.5)+(1-e)*.6*Math.max(0,vnoise(20+i,u*3));
+      glow(r.x,r.y,40,r.c,I*.9);
+      ctx.setLineDash(i===1?[3,3]:[]); ctx.strokeStyle=rgba(r.c,.9); ctx.lineWidth=1.5;
+      ctx.beginPath(); ctx.ellipse(r.x,r.y,i===1?16:13,i===1?7:10,i===1?-.3:0,0,Math.PI*2); ctx.stroke(); ctx.setLineDash([]);
+    });
+    label("Prefrontal cortex",112,178,"center");
+    label("Auditory cortex",262,236,"left");
+    label("Hippocampus (deep)",172,276,"center");
+    // traces
+    const PX=128;
+    REG.forEach((r,i)=>{
+      const y0=344+i*34;
+      label(r.n,20,y0+4,"left",rgba(r.c,1),MONO);
+      ctx.strokeStyle=rgba(r.c,.9); ctx.lineWidth=1.8; ctx.beginPath();
+      for(let px=0;px<=316;px+=2){
+        const tau=u-(316-px)/PX, ee=sm(2,7,tau);
+        const v=ee*Math.sin(2*Math.PI*(F*tau-r.lag*.5))+(1-ee)*(.6*vnoise(30+i,tau*4)+.4*vnoise(40+i,tau*10));
+        const y=y0-v*11; px?ctx.lineTo(64+px,y):ctx.moveTo(64,y);
+      }
+      ctx.stroke();
+    });
+    label(e<.5?"regions out of step":"regions share one rhythm",380,326,"right","rgba(147,161,172,1)",MONO);
+  }
+
+  // ---- Scene 4: microglia and amyloid
+  const PLQ=[[128,132,26],[292,138,22],[160,322,28],[300,318,20]];
+  const GLI=[[222,58,1],[46,212,0],[240,228,2],[370,236,3],[70,414,2],[380,60,1]];
+  function sGlia(){
+    const e=sm(2,6,u), m=sm(4,10,u), shrink=1-.5*sm(7,13,u), take=sm(6,8,u);
+    // faint neurons pulsing with the rhythm
+    [[60,70],[340,390],[200,190],[40,320],[360,170]].forEach((q,i)=>{
+      glow(q[0],q[1],18,ORANGE,e*beat(u)*.5);
+      ctx.beginPath(); ctx.moveTo(q[0],q[1]-7); ctx.lineTo(q[0]+6,q[1]+4); ctx.lineTo(q[0]-6,q[1]+4); ctx.closePath(); ctx.fillStyle=rgba(CYAN,.25); ctx.fill();
+    });
+    PLQ.forEach((p,i)=>{
+      const r=p[2]*shrink;
+      glow(p[0],p[1],r*2.3,AMBER,.35);
+      ctx.beginPath();
+      for(let v=0;v<14;v++){ const a=v/14*Math.PI*2, rr=r*(.72+.38*hash(i+50,v)); const x=p[0]+Math.cos(a)*rr, y=p[1]+Math.sin(a)*rr; v?ctx.lineTo(x,y):ctx.moveTo(x,y); }
+      ctx.closePath(); ctx.fillStyle=rgba(AMBER,.7); ctx.fill(); ctx.strokeStyle=rgba(AMBER,1); ctx.lineWidth=1; ctx.stroke();
+      for(let v=0;v<7;v++){ const a=hash(i+60,v)*Math.PI*2, rr=r*(1.15+.35*hash(i+70,v)); dot(p[0]+Math.cos(a)*rr,p[1]+Math.sin(a)*rr,1.6,rgba(AMBER,.8)); }
+    });
+    GLI.forEach((g,j)=>{
+      const p=PLQ[g[2]], dx=g[0]-p[0], dy=g[1]-p[1], d=Math.hypot(dx,dy)||1;
+      const tx=p[0]+dx/d*(p[2]*shrink+14), ty=p[1]+dy/d*(p[2]*shrink+14);
+      const x=lerp(g[0],tx,m), y=lerp(g[1],ty,m);
+      // amyloid fragments pulled into the cell
+      for(let q=0;q<5;q++){
+        const ph=fr(u*.6+q/5+j*.13), a=Math.atan2(dy,dx)+(hash(j,q)-.5)*1.2;
+        const sx=p[0]+Math.cos(a)*p[2]*shrink*.9, sy=p[1]+Math.sin(a)*p[2]*shrink*.9;
+        const al=take*m*Math.sin(Math.PI*ph);
+        if(al>.02) dot(lerp(sx,x,ph),lerp(sy,y,ph),2,rgba(AMBER,al));
+      }
+      const L=36*(1-.55*e), w=1.3+1.6*e, r=5.5+4.5*e;
+      ctx.strokeStyle=rgba(GREEN,.8); ctx.lineCap="round";
+      for(let b=0;b<6;b++){
+        const a=j*1.7+b*Math.PI/3+.25*Math.sin(u*.9+b+j), len=L*(.8+.4*hash(j+80,b));
+        const mx=x+Math.cos(a)*len*.6, my=y+Math.sin(a)*len*.6;
+        ctx.lineWidth=w; line(x,y,x+Math.cos(a)*len,y+Math.sin(a)*len);
+        ctx.lineWidth=w*.7; [-1,1].forEach(s=>{ const a2=a+s*.55; line(mx,my,mx+Math.cos(a2)*len*.45,my+Math.sin(a2)*len*.45); });
+      }
+      ctx.lineCap="butt";
+      glow(x,y,r*3.2,GREEN,.3+.4*e);
+      dot(x,y,r,rgba(GREEN,.9));
+    });
+    dot(28,432,5,rgba(GREEN,.9)); label("Microglia",38,436,"left");
+    dot(140,432,5,rgba(AMBER,.9)); label("Amyloid plaque",150,436,"left");
+    label(e<.3?"resting":m<.8?"activating":"clearing",380,436,"right",rgba(e<.3?CYAN:GREEN,1),MONO);
+  }
+
+  // ---- Scene 5: glymphatic flush
+  function sFlow(dt){
+    const e=sm(2,6,u);
+    flow+=dt*(.03+.1*e); flowA+=dt*(.008+.07*e);
+    const AX=92, R=24+(1.5+5*e)*Math.sin(2*Math.PI*F*u), VX=330, VR=20;
+    // tissue neurons
+    [[190,170],[260,120],[230,260],[170,350],[280,370]].forEach(q=>{
+      glow(q[0],q[1],16,ORANGE,e*beat(u)*.45);
+      ctx.beginPath(); ctx.moveTo(q[0],q[1]-6); ctx.lineTo(q[0]+5,q[1]+4); ctx.lineTo(q[0]-5,q[1]+4); ctx.closePath(); ctx.fillStyle=rgba(CYAN,.2); ctx.fill();
+    });
+    // perivascular spaces
+    ctx.fillStyle=rgba(BLUE,.13);
+    ctx.fillRect(AX-R-16,0,16,VH); ctx.fillRect(AX+R,0,16,VH);
+    ctx.fillRect(VX-VR-14,0,14,VH); ctx.fillRect(VX+VR,0,14,VH);
+    // artery
+    const g=ctx.createLinearGradient(AX-R,0,AX+R,0);
+    g.addColorStop(0,rgba(RED,.55)); g.addColorStop(.5,rgba(RED,.85)); g.addColorStop(1,rgba(RED,.55));
+    ctx.fillStyle=g; ctx.fillRect(AX-R,0,R*2,VH);
+    ctx.strokeStyle=rgba([240,130,130],.9); ctx.lineWidth=3; line(AX-R,0,AX-R,VH); line(AX+R,0,AX+R,VH);
+    for(let i=0;i<12;i++){ const y=fr(hash(i,1)+u*.3)*470-15, x=AX+(hash(i,2)-.5)*R*1.2; ctx.fillStyle=rgba([255,170,170],.55); ctx.beginPath(); ctx.ellipse(x,y,5,3,0,0,Math.PI*2); ctx.fill(); }
+    // vein
+    ctx.fillStyle=rgba([110,100,190],.55); ctx.fillRect(VX-VR,0,VR*2,VH);
+    ctx.strokeStyle=rgba([150,140,220],.8); ctx.lineWidth=2; line(VX-VR,0,VX-VR,VH); line(VX+VR,0,VX+VR,VH);
+    // VIP interneuron signalling the artery
+    const VIPX=180, VIPY=70;
+    ctx.strokeStyle=rgba(PINK,.6); ctx.lineWidth=1.3; line(VIPX,VIPY,AX+R+2,52); line(VIPX,VIPY,AX+R+2,92);
+    for(let k=Math.floor((u-.5)*F);k<=Math.floor(u*F);k++){
+      const p=(u-k/F)/.45; if(p<0||p>1) continue;
+      for(let q=0;q<4;q++){ const ty=50+q*14; dot(lerp(VIPX,AX+R+3,p),lerp(VIPY,ty,p),2,rgba(PINK,e*(1-p))); }
+    }
+    glow(VIPX,VIPY,20,PINK,.3+.5*e*beat(u));
+    dot(VIPX,VIPY,6,rgba(PINK,.95));
+    label("VIP interneuron",194,74,"left");
+    // amyloid carried to the vein
+    for(let i=0;i<18;i++){
+      const a=fr(hash(i,7)+flowA), x=lerp(AX+R+20,VX-VR-4,a), y=40+hash(i,8)*360+6*Math.sin(a*8+i);
+      const al=Math.min(1,a*8)*(1-sm(.9,1,a));
+      dot(x,y,3,rgba(AMBER,al*.9));
+    }
+    // CSF: down the arterial sheath, then across the tissue
+    for(let i=0;i<60;i++){
+      const s=fr(hash(i,3)+flow), yE=90+hash(i,4)*320, side=hash(i,5)<.5;
+      let x,y,al=1;
+      if(s<.35){ x=side?AX+R+8:AX-R-8; y=lerp(-5,yE,s/.35); }
+      else { if(!side) continue; const p=(s-.35)/.65; x=lerp(AX+R+8,VX-VR-7,p); y=yE+8*Math.sin(p*6+i); al=1-sm(.85,1,p); }
+      glow(x,y,7,BLUE,.6*al); dot(x,y,1.6,rgba([200,230,255],al));
+    }
+    label("Artery",AX,432,"center","rgba(255,235,235,.95)");
+    label("Vein",VX,432,"center","rgba(235,235,255,.95)");
+    dot(150,410,4,rgba(BLUE,1)); label("CSF",160,414,"left");
+    dot(206,410,4,rgba(AMBER,1)); label("Amyloid",216,414,"left");
+    ctx.strokeStyle=rgba(WHITE,.6); ctx.lineWidth=1.5; line(AX+R+22,20,AX+R+22,40); ctx.beginPath(); ctx.moveTo(AX+R+17,34); ctx.lineTo(AX+R+22,40); ctx.lineTo(AX+R+27,34); ctx.stroke();
+  }
+
+  // ---- Scene 6: focus
+  function sFocus(){
+    const cx=200, cy=180;
+    ctx.lineWidth=2;
+    for(let k=Math.floor((u-3)*F);k<=Math.floor(u*F);k++){
+      const r=20+(u-k/F)*50; if(r>170) continue;
+      ctx.strokeStyle=rgba(ORANGE,Math.max(0,1-r/170)*.35); ctx.beginPath(); ctx.arc(cx,cy,r,0,Math.PI*2); ctx.stroke();
+    }
+    const br=58+8*Math.sin(2*Math.PI*u/8);
+    glow(cx,cy,br*2,ORANGE,.35+.15*beat(u));
+    ctx.fillStyle="#0C1820"; ctx.beginPath(); ctx.arc(cx,cy,br,0,Math.PI*2); ctx.fill();
+    ctx.strokeStyle=rgba(ORANGE,.8); ctx.stroke();
+    label("40",cx,cy+18,"center",rgba(WHITE,1),'500 50px "IBM Plex Mono",ui-monospace,monospace');
+    label("clicks every second",cx,cy+br+34,"center");
+    const n=running?Math.floor(elapsed()*40):0;
+    label(running?"Clicks heard this session: "+n.toLocaleString():"Tap Start sound to begin listening",cx,352,"center",running?rgba(ORANGE,1):"rgba(147,161,172,1)",MONO);
+    label("Eyes open · stay alert · breathe slowly",cx,380,"center","rgba(147,161,172,1)",MONO);
+  }
+
+  const DRAW=[sPath,sCortex,sBrain,sGlia,sFlow,sFocus];
+
+  function resize(){
+    const r=$("stage").getBoundingClientRect();
+    dpr=Math.min(2,window.devicePixelRatio||1); cw=r.width; ch=r.height;
+    cv.width=Math.round(cw*dpr); cv.height=Math.round(ch*dpr);
+    sc=Math.min(cw/VW,ch/VH); ox=(cw-VW*sc)/2; oy=(ch-VH*sc)/2; dirty=true;
+  }
+  function draw(dt){
+    ctx.setTransform(1,0,0,1,0,0); ctx.fillStyle="#05090D"; ctx.fillRect(0,0,cv.width,cv.height);
+    ctx.setTransform(dpr*sc,0,0,dpr*sc,dpr*ox,dpr*oy);
+    ctx.save(); ctx.beginPath(); ctx.rect(-10,0,VW+20,VH); ctx.clip();
+    DRAW[scene](dt);
+    ctx.restore();
+    const d=SCENES[scene].d, fade=clamp(Math.min(u/.5,(d-u)/.5),0,1);
+    if(fade<1){ ctx.setTransform(1,0,0,1,0,0); ctx.fillStyle="rgba(5,9,13,"+(1-fade)+")"; ctx.fillRect(0,0,cv.width,cv.height); }
+  }
+  function goScene(i){
+    scene=(i+SCENES.length)%SCENES.length; u=0; flow=0; flowA=0; dirty=true;
+    $("capT").textContent=SCENES[scene].t; $("capP").textContent=SCENES[scene].p; $("capS").textContent=SCENES[scene].s;
+    document.querySelectorAll("#dots button").forEach((b,j)=>b.setAttribute("aria-current",j===scene?"true":"false"));
+  }
+  SCENES.forEach((s,i)=>{
+    const b=document.createElement("button"); b.setAttribute("aria-label","Part "+(i+1)+": "+s.t.replace(/^\d · /,""));
+    b.addEventListener("click",()=>goScene(i)); $("dots").appendChild(b);
+  });
+
+  function setText(el,s){ if(el.textContent!==s) el.textContent=s; }
+  function miniStatus(){
+    setText($("fState"), !running?"Sound off":paused?"Sound paused":"Sound on · 40 Hz");
+    setText($("fTime"), running?fmt(durMin*60-elapsed())+" left":"");
+    setText($("fStart"), !running?"Start sound":paused?"Resume sound":"Stop sound");
+    $("fsess").classList.toggle("on",running&&!paused);
+  }
+
+  function frame(ts){
+    if(!fOpen) return;
+    raf=requestAnimationFrame(frame);
+    const dt=lastTs?Math.min(.1,(ts-lastTs)/1000):0; lastTs=ts;
+    flickerFrame(dt);
+    if(fPlaying){ u+=dt; if(u>=SCENES[scene].d) goScene(scene+1); }
+    if(fPlaying||dirty){ draw(fPlaying?dt:0); dirty=false; }
+    miniStatus();
+  }
+
+  /* ---------- 40 Hz flash ----------
+     A screen can only change on its refresh ticks, so an exact 40 Hz flash needs
+     a refresh rate that is a whole multiple of 40 (80, 120, 160, 240 Hz).
+     At 60 Hz a 40 Hz on/off pattern aliases to 20 Hz, the wrong frequency and
+     the band most likely to provoke photosensitive seizures, so we refuse it. */
+  let fl={mode:"off", hz:0, fpc:0, on:1, n:0, samples:[]};
+  function flashMsg(t){ $("flashMsg").hidden=!t; $("flashMsg").textContent=t||""; }
+  function setFlashBtn(){
+    const on=fl.mode==="on", b=$("fFlash");
+    b.classList.toggle("on",on); b.setAttribute("aria-pressed",on?"true":"false");
+    b.textContent= fl.mode==="measuring"?"Checking screen…" : on?"40 Hz flash: on":"40 Hz flash: off";
+  }
+  function stopFlash(msg){ fl.mode="off"; flashEl.style.opacity="0"; setFlashBtn(); flashMsg(msg||""); }
+  function median(a){ const b=a.slice().sort((x,y)=>x-y); return b[b.length>>1]; }
+  function flickerFrame(dt){
+    if(fl.mode==="off") return;
+    if(dt>0) fl.samples.push(dt);
+    if(fl.mode==="measuring"){
+      if(fl.samples.length<60) return;
+      const hz=1/median(fl.samples), fpc=Math.round(hz/40);
+      fl.samples=[];
+      if(fpc>=2 && Math.abs(hz-fpc*40)<=fpc*40*.04){
+        fl.hz=fpc*40; fl.fpc=fpc; fl.on=Math.max(1,Math.floor(fpc/2)); fl.n=0; fl.mode="on";
+        setFlashBtn(); flashMsg("Screen refreshes at "+fl.hz+" Hz, so each flash cycle is exactly "+fpc+" frames = 25 ms (40 Hz). The flash is not phase-locked to the sound.");
+      } else {
+        stopFlash("Screen is running at "+Math.round(hz)+" fps here. An exact 40 Hz flash needs 80, 120 or 160 fps; at "+Math.round(hz)+" it would flicker at "+(Math.round(hz)===60?"20 Hz":"an uneven rate")+" instead, so it stays off. iPhone Pro tip: see “Using it on your phone”. Tap to dismiss.");
+      }
+      return;
+    }
+    // on: advance exactly one step per displayed frame
+    flashEl.style.opacity = (fl.n % fl.fpc) < fl.on ? "0.5" : "0";
+    fl.n++;
+    if(fl.samples.length>=45){
+      const hz=1/median(fl.samples); fl.samples=[];
+      if(Math.abs(hz-fl.hz)>fl.hz*.05) stopFlash("The screen's frame rate changed (for example Low Power Mode), so the flash was stopped to avoid flickering at the wrong frequency.");
+    }
+  }
+  $("fFlash").addEventListener("click",()=>{
+    if(fl.mode!=="off"){ stopFlash(""); return; }
+    flashMsg(""); $("flashWarn").hidden=false;
+  });
+  $("flashMsg").addEventListener("click",()=>flashMsg(""));
+  $("flashNo").addEventListener("click",()=>{ $("flashWarn").hidden=true; });
+  $("flashOk").addEventListener("click",()=>{
+    $("flashWarn").hidden=true; fl.samples=[]; fl.mode="measuring"; setFlashBtn();
+  });
+
+  async function lockFilm(){
+    try{
+      if(!("wakeLock" in navigator) || document.hidden || filmLock) return;
+      filmLock=await navigator.wakeLock.request("screen");
+      filmLock.addEventListener("release",()=>{ filmLock=null; });
+    }catch(e){}
+  }
+  function openFilm(){
+    fOpen=true; film.hidden=false; document.body.style.overflow="hidden";
+    resize(); goScene(scene); lastTs=0; cancelAnimationFrame(raf); raf=requestAnimationFrame(frame);
+    lockFilm(); $("fClose").focus();
+  }
+  function closeFilm(){
+    fOpen=false; film.hidden=true; document.body.style.overflow=""; cancelAnimationFrame(raf);
+    stopFlash(""); $("flashWarn").hidden=true;
+    try{ filmLock&&filmLock.release(); }catch(e){} filmLock=null;
+    $("filmBtn").focus();
+  }
+  $("filmBtn").addEventListener("click",openFilm);
+  $("fClose").addEventListener("click",closeFilm);
+  $("fPlay").addEventListener("click",()=>{ fPlaying=!fPlaying; $("fPlay").textContent=fPlaying?"Pause video":"Play video"; });
+  $("fStart").addEventListener("click",()=>$("startBtn").click());
+  document.addEventListener("keydown",e=>{ if(fOpen && e.key==="Escape") closeFilm(); });
+  if("ResizeObserver" in window) new ResizeObserver(()=>{ if(fOpen) resize(); }).observe($("stage"));
+  else window.addEventListener("resize",()=>{ if(fOpen) resize(); });
+  document.addEventListener("visibilitychange",()=>{
+    if(!fOpen) return;
+    if(document.hidden){ if(fl.mode!=="off") stopFlash("Flash stopped while the page was hidden. Turn it on again when you're ready."); }
+    else { lastTs=0; lockFilm(); }
+  });
 })();
 </script>
 
