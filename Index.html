@@ -106,6 +106,7 @@ button.film-open{font-size:15px}
 .fnote{background:#2E2511;color:#F2C766;border-radius:8px;padding:10px 12px;font-size:13px;margin:0 auto;max-width:560px;width:100%}
 .fnote .row{margin-top:8px;gap:8px}
 .flash{position:fixed;inset:0;z-index:60;background:#FFFFFF;opacity:0;pointer-events:none}
+.tick{position:fixed;right:0;bottom:0;width:2px;height:2px;z-index:61;background:#FFFFFF;opacity:0;pointer-events:none}
 </style>
 </head>
 <body>
@@ -212,6 +213,7 @@ button.film-open{font-size:15px}
   </div>
 </div>
 <div class="flash" id="flash"></div>
+<div class="tick" id="tick"></div>
 
 <audio id="player" preload="auto" playsinline></audio>
 <audio id="tester" preload="auto" playsinline></audio>
@@ -394,7 +396,7 @@ button.film-open{font-size:15px}
   })();
 
   /* ---------- Video view: looping animation of what 40 Hz does ---------- */
-  const film=$("film"), cv=$("cv"), ctx=cv.getContext("2d"), flashEl=$("flash");
+  const film=$("film"), cv=$("cv"), ctx=cv.getContext("2d"), flashEl=$("flash"), tickEl=$("tick");
   const F=2;                  // pulses per second shown (real 40 Hz slowed 20x)
   const VW=400, VH=440;       // virtual drawing box
   const ORANGE=[240,151,63], CYAN=[95,169,201], VIOLET=[155,140,255], AMBER=[222,170,70],
@@ -792,7 +794,7 @@ button.film-open{font-size:15px}
     b.classList.toggle("on",on); b.setAttribute("aria-pressed",on?"true":"false");
     b.textContent= fl.mode==="measuring"?"Checking screen…" : on?"40 Hz flash: on":"40 Hz flash: off";
   }
-  function stopFlash(msg){ fl.mode="off"; flashEl.style.opacity="0"; setFlashBtn(); flashMsg(msg||""); }
+  function stopFlash(msg){ fl.mode="off"; flashEl.style.opacity="0"; tickEl.style.opacity="0"; setFlashBtn(); flashMsg(msg||""); }
   // Frame intervals (ms) → the screen's refresh period and how many ticks were missed.
   // The fastest intervals give the refresh period (a busy page skips ticks, which only
   // makes some intervals longer); Safari rounds timestamps to whole ms, hence the tolerance.
@@ -800,11 +802,20 @@ button.film-open{font-size:15px}
     const b=a.slice().sort((x,y)=>x-y), fast=b[Math.floor(b.length*.2)];
     const fpc=Math.round(1000/fast/40), P=fpc>=1?25/fpc:fast;
     let ticks=0; a.forEach(d=>{ ticks+=Math.max(1,Math.round(d/P)); });
-    return {fast, fpc, P, avg:1000*a.length/a.reduce((x,y)=>x+y,0), skipped:1-a.length/ticks,
+    return {raw:a, fast, fpc, P, avg:1000*a.length/a.reduce((x,y)=>x+y,0), skipped:1-a.length/ticks,
             exact:fpc>=2 && Math.abs(1000/fast-fpc*40)<=fpc*40*.07};
+  }
+  // Compact summary of frame gaps for troubleshooting, e.g. "Frame gaps: 8 ms ×70, 17 ms ×20."
+  function gaps(a){
+    const h={}; a.forEach(d=>{ const k=Math.round(d); h[k]=(h[k]||0)+1; });
+    return "Frame gaps: "+Object.keys(h).map(Number).sort((x,y)=>h[y]-h[x]).slice(0,5).map(k=>k+" ms ×"+h[k]).join(", ")+".";
   }
   function flickerFrame(dtMs,ts){
     if(fl.mode==="off") return;
+    // ProMotion lowers the refresh rate when the picture looks idle. A 2-pixel,
+    // practically invisible change on every frame keeps the screen at full rate.
+    fl.f=(fl.f||0)+1; tickEl.style.opacity = fl.f%2 ? "0.02" : "0.03";
+    if(fl.warm>0){ fl.warm--; return; }   // ignore the first frames after starting
     if(dtMs>0 && dtMs<100) fl.samples.push(dtMs);
     if(fl.mode==="measuring"){
       if(fl.samples.length<90) return;
@@ -813,10 +824,10 @@ button.film-open{font-size:15px}
         fl.fpc=r.fpc; fl.hz=r.fpc*40; fl.P=r.P; fl.on=Math.max(1,Math.floor(r.fpc/2)); fl.t0=ts; fl.mode="on";
         setFlashBtn(); flashMsg("Screen refreshes at "+fl.hz+" Hz, so each flash cycle is exactly "+r.fpc+" frames = 25 ms (40 Hz). The video redraws less often while the flash runs, to keep the timing steady. Tap to dismiss.");
       } else if(r.exact){
-        stopFlash("Screen refreshes at "+r.fpc*40+" Hz, but the phone skipped "+Math.round(r.skipped*100)+"% of frames, so the flash would not be a clean 40 Hz. Open the page in Safari itself (compass icon), tap Pause video, then try again. Tap to dismiss.");
+        stopFlash("Screen refreshes at "+r.fpc*40+" Hz, but the phone skipped "+Math.round(r.skipped*100)+"% of frames, so the flash would not be a clean 40 Hz. Open the page in Safari itself (compass icon), tap Pause video, then try again. "+gaps(r.raw)+" Tap to dismiss.");
       } else {
         const hz=Math.round(r.avg);
-        stopFlash("Screen is running at about "+hz+" fps here. An exact 40 Hz flash needs 80, 120 or 160; at "+hz+" it would flicker at "+(Math.abs(hz-60)<4?"20 Hz":"an uneven rate")+", so it stays off. iPhone Pro tip: see “Using it on your phone”. Tap to dismiss.");
+        stopFlash("Screen is running at about "+hz+" fps here. An exact 40 Hz flash needs 80, 120 or 160; at "+hz+" it would flicker at "+(Math.abs(hz-60)<4?"20 Hz":"an uneven rate")+", so it stays off. iPhone Pro tip: see “Using it on your phone”. "+gaps(r.raw)+" Tap to dismiss.");
       }
       return;
     }
@@ -836,7 +847,7 @@ button.film-open{font-size:15px}
   $("flashMsg").addEventListener("click",()=>flashMsg(""));
   $("flashNo").addEventListener("click",()=>{ $("flashWarn").hidden=true; });
   $("flashOk").addEventListener("click",()=>{
-    $("flashWarn").hidden=true; fl.samples=[]; fl.mode="measuring"; setFlashBtn();
+    $("flashWarn").hidden=true; fl.samples=[]; fl.warm=10; fl.mode="measuring"; setFlashBtn();
   });
 
   async function lockFilm(){
